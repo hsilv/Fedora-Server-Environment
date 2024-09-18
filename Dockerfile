@@ -1,15 +1,17 @@
 # Usar la imagen base de Fedora
 FROM fedora:latest
 
-# Instalar Docker dentro de la imagen
-RUN dnf -y update && \
-    dnf -y install dnf-plugins-core && \
-    dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo && \
-    dnf -y install docker-ce docker-ce-cli containerd.io && \
-    dnf clean all
+# Crear el directorio de scripts
+RUN mkdir -p /scripts
 
-# Iniciar el servicio de Docker
-RUN systemctl enable docker
+# Copiar todos los scripts al directorio de scripts
+COPY install-scripts/ /install-scripts/
+
+# Dar permisos de ejecución a todos los scripts
+RUN chmod +x /install-scripts/*.sh
+
+# Ejecutar todos los scripts
+RUN for script in /install-scripts/*.sh; do $script; done
 
 # Comando por defecto
 CMD ["bash"]
