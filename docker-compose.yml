@@ -1,0 +1,23 @@
+services:
+  server:
+    tty: true
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: server
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8080:8080"
+    command: >
+      bash -c "
+      docker build -t jenkins ./services/jenkins && 
+      docker run -d \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      --name jenkins-docker \
+      -p 8080:8080 \
+      jenkins &&
+      tail -f /dev/null
+      "

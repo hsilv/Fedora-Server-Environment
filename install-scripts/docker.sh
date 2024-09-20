@@ -19,4 +19,3 @@ fi
 
 # Start Docker
 systemctl enable docker
-
