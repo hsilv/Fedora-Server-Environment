@@ -2,5 +2,8 @@
 
 # * This script initializes the Docker service on Fedora
 
+# Enable the Docker service
+systemctl enable docker
+
 # Start the Docker service
-service docker start
+systemctl start docker
