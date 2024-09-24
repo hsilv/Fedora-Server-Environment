@@ -16,6 +16,3 @@ if [ ! -d "/run/systemd" ]; then
     mkdir -p /run/systemd
     echo 'docker' > /run/systemd/container
 fi
-
-# Start Docker
-systemctl enable docker
