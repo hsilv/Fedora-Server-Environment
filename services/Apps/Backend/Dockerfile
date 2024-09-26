@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
     libonig-dev \
     libzip-dev \
+    wget \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install gd mbstring zip
 
@@ -32,6 +33,10 @@ RUN docker-php-ext-install soap pdo_mysql
 # Instalar Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
+# Instalar Symfony CLI
+RUN wget https://get.symfony.com/cli/installer -O - | bash \
+    && mv /root/.symfony*/bin/symfony /usr/local/bin/symfony
+
 # Copiar el archivo .env y la clave SSH
 COPY .env /var/www/.env
 COPY ssh.key /root/.ssh/id_rsa
@@ -39,14 +44,14 @@ COPY ssh.key /root/.ssh/id_rsa
 # Asegurarse de que la clave SSH tenga los permisos correctos
 RUN chmod 600 /root/.ssh/id_rsa
 
+RUN eval $(ssh-agent -s) \
+    && ssh-add /root/.ssh/id_rsa
+
 # Comandos para depuración
 RUN echo "Contenido del archivo .env:" \
     && cat /var/www/.env \
     && echo "Contenido del archivo id_rsa:" \
     && cat /root/.ssh/id_rsa
-
-RUN eval "$(ssh-agent -s)" \
-    && ssh-add /root/.ssh/id_rsa
 
 # Leer las variables del archivo .env y configurar SSH
 RUN export $(cat /var/www/.env | xargs) \
@@ -61,8 +66,14 @@ RUN composer update
 RUN mkdir -p /var/www/html/var /var/www/html/public \
     && chown -R www-data:www-data /var/www/html/var /var/www/html/public
 
+# Configurar Apache para servir el proyecto Symfony
+COPY apache-symfony.conf /etc/apache2/sites-available/000-default.conf
+
+# Habilitar el módulo de reescritura de Apache
+RUN a2enmod rewrite
+
 # Exponer el puerto 80
 EXPOSE 80
 
 # Iniciar Apache
-CMD ["apache2-foreground"]
+CMD ["symfony", "server:start", "--no-tls", "--port=80", "--dir=/var/www/html/public"]
