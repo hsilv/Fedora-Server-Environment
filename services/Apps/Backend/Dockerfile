@@ -1,4 +1,4 @@
-FROM php:8.2-apache-bullseye
+FROM php:8.2-cli
 
 # Instalar dependencias necesarias
 RUN apt-get update && apt-get install -y \
@@ -37,43 +37,36 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 RUN wget https://get.symfony.com/cli/installer -O - | bash \
     && mv /root/.symfony*/bin/symfony /usr/local/bin/symfony
 
+# Crear un usuario no root
+RUN useradd -m symfonyuser
+
 # Copiar el archivo .env y la clave SSH
-COPY .env /var/www/.env
-COPY ssh.key /root/.ssh/id_rsa
+COPY .env /home/symfonyuser/.env
+COPY ssh.key /home/symfonyuser/.ssh/id_rsa
 
 # Asegurarse de que la clave SSH tenga los permisos correctos
-RUN chmod 600 /root/.ssh/id_rsa
+RUN chmod 600 /home/symfonyuser/.ssh/id_rsa \
+    && chown -R symfonyuser:symfonyuser /home/symfonyuser
 
+USER symfonyuser
+
+# Configurar SSH y clonar el repositorio
 RUN eval $(ssh-agent -s) \
-    && ssh-add /root/.ssh/id_rsa
+    && ssh-add /home/symfonyuser/.ssh/id_rsa \
+    && ssh-keyscan github.com >> /home/symfonyuser/.ssh/known_hosts \
+    && git clone $(grep REPO_URL /home/symfonyuser/.env | cut -d '=' -f2) /var/www/html
 
-# Comandos para depuración
-RUN echo "Contenido del archivo .env:" \
-    && cat /var/www/.env \
-    && echo "Contenido del archivo id_rsa:" \
-    && cat /root/.ssh/id_rsa
-
-# Leer las variables del archivo .env y configurar SSH
-RUN export $(cat /var/www/.env | xargs) \
-    && ssh-keyscan github.com >> /root/.ssh/known_hosts \
-    && git clone $REPO_URL /var/www/html
-
-# Instalar dependencias de Symfony
+# Instalar dependencias de Symfony sin ejecutar scripts automáticos
 WORKDIR /var/www/html
-RUN composer update
+RUN composer install --no-scripts
 
 # Crear las carpetas si no existen y dar permisos
+USER root
 RUN mkdir -p /var/www/html/var /var/www/html/public \
     && chown -R www-data:www-data /var/www/html/var /var/www/html/public
 
-# Configurar Apache para servir el proyecto Symfony
-COPY apache-symfony.conf /etc/apache2/sites-available/000-default.conf
+# Exponer el puerto 8000
+EXPOSE 8000
 
-# Habilitar el módulo de reescritura de Apache
-RUN a2enmod rewrite
-
-# Exponer el puerto 80
-EXPOSE 80
-
-# Iniciar Apache
-CMD ["symfony", "server:start", "--no-tls", "--port=80", "--dir=/var/www/html/public"]
+# Iniciar el servidor Symfony
+CMD ["symfony", "server:start", "--no-tls", "--port=8000"]
